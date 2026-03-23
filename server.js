@@ -51,8 +51,13 @@ app.post('/api/contact', async (req, res) => {
         }
 
         // 1. Save to database
-        const query = 'INSERT INTO messages (name, email, subject, message) VALUES (?, ?, ?, ?)';
-        await pool.execute(query, [name, email, subject || 'No Subject', message]);
+        try {
+            const query = 'INSERT INTO messages (name, email, subject, message) VALUES (?, ?, ?, ?)';
+            await pool.execute(query, [name, email, subject || 'No Subject', message]);
+        } catch (dbError) {
+            console.error('Database insertion failed:', dbError.message);
+            // We continue anyway to try sending the email
+        }
 
         // 2. Send email notification
         const mailOptions = {
