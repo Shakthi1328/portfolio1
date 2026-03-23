@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 const path = require('path');
 require('dotenv').config();
@@ -21,15 +21,10 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Database connection pool
-const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASS || '',
-    database: process.env.DB_NAME || 'portfolio',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+// Database connection pool (PostgreSQL)
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL || `postgresql://${process.env.DB_USER || 'root'}:${process.env.DB_PASS || ''}@${process.env.DB_HOST || 'localhost'}:5432/${process.env.DB_NAME || 'portfolio'}`,
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
 // Nodemailer transporter
@@ -58,8 +53,8 @@ app.post('/api/contact', async (req, res) => {
 
         // 1. Save to database
         try {
-            const query = 'INSERT INTO messages (name, email, subject, message) VALUES (?, ?, ?, ?)';
-            await pool.execute(query, [name, email, subject || 'No Subject', message]);
+            const query = 'INSERT INTO messages (name, email, subject, message) VALUES ($1, $2, $3, $4)';
+            await pool.query(query, [name, email, subject || 'No Subject', message]);
         } catch (dbError) {
             console.error('Database insertion failed:', dbError.message);
             // We continue anyway to try sending the email

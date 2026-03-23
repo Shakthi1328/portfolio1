@@ -1,10 +1,8 @@
--- Run this script in your MySQL interface (e.g., phpMyAdmin, MySQL Workbench, or CLI)
-
-CREATE DATABASE IF NOT EXISTS portfolio;
-USE portfolio;
+-- PostgreSQL Schema
+-- Run this in your PostgreSQL interface (e.g., pgAdmin, Supabase SQL Editor, or CLI)
 
 CREATE TABLE IF NOT EXISTS messages (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
     subject VARCHAR(255),
