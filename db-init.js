@@ -1,24 +1,19 @@
-const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 require('dotenv').config();
 
 async function initDB() {
+    const pool = new Pool({
+        connectionString: process.env.DATABASE_URL || `postgresql://${process.env.DB_USER || 'postgres'}:${process.env.DB_PASS || ''}@${process.env.DB_HOST || 'localhost'}:5432/${process.env.DB_NAME || 'portfolio'}`,
+        ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+    });
+
     try {
-        // Connect without specifying a database first
-        const c = await mysql.createConnection({
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASS
-        });
-        
-        const dbName = process.env.DB_NAME || 'portfolio';
-        await c.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
-        console.log(`Database '${dbName}' created or already exists.`);
-        
-        await c.query(`USE \`${dbName}\``);
-        
-        await c.query(`
+        const client = await pool.connect();
+        console.log("Connected to PostgreSQL successfully.");
+
+        await client.query(`
             CREATE TABLE IF NOT EXISTS messages (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
                 email VARCHAR(255) NOT NULL,
                 subject VARCHAR(255),
@@ -26,11 +21,13 @@ async function initDB() {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
-        console.log("Table 'messages' created successfully.");
-        
-        await c.end();
+        console.log("Table 'messages' ensured in database.");
+
+        client.release();
+        await pool.end();
     } catch (e) {
         console.error("DB INIT ERROR:", e.message);
     }
 }
+
 initDB();

@@ -23,13 +23,15 @@ app.get('/', (req, res) => {
 
 // Database connection pool (PostgreSQL)
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL || `postgresql://${process.env.DB_USER || 'root'}:${process.env.DB_PASS || ''}@${process.env.DB_HOST || 'localhost'}:5432/${process.env.DB_NAME || 'portfolio'}`,
+    connectionString: process.env.DATABASE_URL || `postgresql://${process.env.DB_USER || 'postgres'}:${process.env.DB_PASS || ''}@${process.env.DB_HOST || 'localhost'}:5432/${process.env.DB_NAME || 'portfolio'}`,
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// Nodemailer transporter
+// Nodemailer transporter (Optimized for Gmail)
 const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
@@ -78,7 +80,8 @@ app.post('/api/contact', async (req, res) => {
         };
 
         if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-            await transporter.sendMail(mailOptions);
+            const info = await transporter.sendMail(mailOptions);
+            console.log('Email sent successfully:', info.messageId);
         } else {
             console.warn('Email credentials not configured. Message saved to DB only.');
         }
