@@ -119,54 +119,77 @@ app.post('/api/contact', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Name, email, and message are required.' });
         }
 
-        // 1. Save to database
+        let dbSaved = false;
+        let emailInitiated = false;
+
+        // 1. Save to database with timeout
         try {
-            await pool.query(
-                'INSERT INTO messages (name, email, subject, message) VALUES ($1, $2, $3, $4)',
-                [name, email, subject || 'No Subject', message]
+            // Create a timeout promise
+            const timeout = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Database timeout')), 5000)
             );
+
+            // Race the query against the timeout
+            await Promise.race([
+                pool.query(
+                    'INSERT INTO messages (name, email, subject, message) VALUES ($1, $2, $3, $4)',
+                    [name, email, subject || 'No Subject', message]
+                ),
+                timeout
+            ]);
+            
+            dbSaved = true;
             console.log('Message saved to database.');
         } catch (dbError) {
-            console.error('DB insert failed (non-fatal):', dbError.message);
+            console.error('DB operation failed:', dbError.message);
+            // We continue even if DB fails, to try and send the email
         }
 
-        // 2. Send email notification
-        console.log('EMAIL_USER set:', !!process.env.EMAIL_USER);
-        console.log('EMAIL_PASS set:', !!process.env.EMAIL_PASS);
-        if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-            try {
-                const transporter = getTransporter();
-                const info = await transporter.sendMail({
-                    from: `"Portfolio Contact" <${process.env.EMAIL_USER}>`,
-                    to: process.env.EMAIL_USER,
-                    replyTo: email,
-                    subject: `Portfolio Contact: ${subject || 'No Subject'} from ${name}`,
-                    text: `Name: ${name}\nEmail: ${email}\nSubject: ${subject || 'No Subject'}\n\nMessage:\n${message}`,
-                    html: `
-                        <h2 style="color:#333">New message from your portfolio</h2>
-                        <p><strong>Name:</strong> ${name}</p>
-                        <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
-                        <p><strong>Subject:</strong> ${subject || 'No Subject'}</p>
-                        <hr/>
-                        <p><strong>Message:</strong></p>
-                        <p>${message.replace(/\n/g, '<br>')}</p>
-                    `
-                });
+        // 2. Send email notification (NON-BLOCKING)
+        const user = process.env.EMAIL_USER;
+        const pass = process.env.EMAIL_PASS;
+
+        if (user && pass) {
+            emailInitiated = true;
+            // We do NOT await this, so the user gets a response immediately
+            const transporter = getTransporter();
+            transporter.sendMail({
+                from: `"Portfolio Contact" <${user}>`,
+                to: user,
+                replyTo: email,
+                subject: `Portfolio Contact: ${subject || 'No Subject'} from ${name}`,
+                text: `Name: ${name}\nEmail: ${email}\nSubject: ${subject || 'No Subject'}\n\nMessage:\n${message}`,
+                html: `
+                    <h2 style="color:#333">New message from your portfolio</h2>
+                    <p><strong>Name:</strong> ${name}</p>
+                    <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
+                    <p><strong>Subject:</strong> ${subject || 'No Subject'}</p>
+                    <hr/>
+                    <p><strong>Message:</strong></p>
+                    <p>${message.replace(/\n/g, '<br>')}</p>
+                `
+            }).then(info => {
                 console.log('Email sent successfully:', info.messageId);
-            } catch (emailError) {
-                console.error('Email send FAILED:', emailError.message);
-                console.error('Full email error:', JSON.stringify(emailError, null, 2));
-                // Still return success since message was saved
-            }
+            }).catch(emailError => {
+                console.error('Email background send FAILED:', emailError.message);
+            });
         } else {
-            console.error('EMAIL CREDENTIALS MISSING - EMAIL_USER or EMAIL_PASS not set in environment!');
+            console.error('EMAIL CREDENTIALS MISSING on Render dashboard!');
         }
 
-        res.json({ success: true, message: 'Message sent successfully!' });
+        // Return success if at least one action was attempted
+        res.json({ 
+            success: true, 
+            message: 'Message processed!',
+            details: {
+                database_saved: dbSaved,
+                email_sent_queued: emailInitiated
+            }
+        });
 
     } catch (error) {
         console.error('Error in /api/contact:', error);
-        res.status(500).json({ success: false, message: 'An error occurred. Please try again.' });
+        res.status(500).json({ success: false, message: 'An internal server error occurred.' });
     }
 });
 
