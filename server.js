@@ -64,33 +64,43 @@ function getTransporter() {
 app.get('/api/test-email', async (req, res) => {
     const user = process.env.EMAIL_USER;
     const pass = process.env.EMAIL_PASS;
+    const allKeys = Object.keys(process.env).filter(k => k.includes('EMAIL') || k.includes('PASS'));
+
+    const diagnostics = {
+        detected_keys: allKeys,
+        user_present: !!user,
+        pass_present: !!pass,
+        node_env: process.env.NODE_ENV,
+        timestamp: new Date().toISOString()
+    };
 
     if (!user || !pass) {
         return res.status(500).json({
             success: false,
             error: 'MISSING_CREDENTIALS',
             message: 'EMAIL_USER or EMAIL_PASS environment variables are not set on Render dashboard.',
-            env_user_present: !!user,
-            env_pass_present: !!pass
+            diagnostics
         });
     }
 
     try {
         const transporter = getTransporter();
+        console.log('Verifying SMTP connection...');
         await transporter.verify();
         
+        console.log('Sending diagnostic email...');
         const info = await transporter.sendMail({
             from: `"Diagnostic Test" <${user}>`,
             to: user,
             subject: 'Render Portfolio Diagnostic Test',
-            text: 'If you are reading this, your Render portfolio email configuration is working correctly!'
+            text: `Diagnostic successful at ${diagnostics.timestamp}. If you see this, delivery is working!`
         });
 
         res.json({
             success: true,
             message: 'SMTP connection verified and test email sent!',
             messageId: info.messageId,
-            user_configured: user
+            diagnostics
         });
     } catch (error) {
         console.error('Diagnostic email failed:', error);
@@ -99,7 +109,8 @@ app.get('/api/test-email', async (req, res) => {
             error: error.code || 'SMTP_ERROR',
             message: error.message,
             stack: error.stack,
-            hint: 'Check if your Gmail App Password is still valid and your email is correct.'
+            diagnostics,
+            hint: 'Check if your Gmail App Password is still valid and your email is correct. Also check Gmail "Recent Activity" for blocked sign-ins.'
         });
     }
 });
