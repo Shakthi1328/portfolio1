@@ -85,16 +85,24 @@ app.get('/api/test-email', async (req, res) => {
 
     try {
         const transporter = getTransporter();
+        
+        // Timeout for SMTP operations
+        const smtpTimeout = (ms) => new Promise((_, reject) => 
+            setTimeout(() => reject(new Error(`SMTP operation timed out after ${ms}ms`)), ms)
+        );
+
         console.log('Verifying SMTP connection...');
-        await transporter.verify();
+        await Promise.race([transporter.verify(), smtpTimeout(8000)]);
         
         console.log('Sending diagnostic email...');
-        const info = await transporter.sendMail({
+        const sendPromise = transporter.sendMail({
             from: `"Diagnostic Test" <${user}>`,
             to: user,
             subject: 'Render Portfolio Diagnostic Test',
             text: `Diagnostic successful at ${diagnostics.timestamp}. If you see this, delivery is working!`
         });
+
+        const info = await Promise.race([sendPromise, smtpTimeout(10000)]);
 
         res.json({
             success: true,
@@ -103,14 +111,13 @@ app.get('/api/test-email', async (req, res) => {
             diagnostics
         });
     } catch (error) {
-        console.error('Diagnostic email failed:', error);
+        console.error('Diagnostic email failed:', error.message);
         res.status(500).json({
             success: false,
             error: error.code || 'SMTP_ERROR',
             message: error.message,
-            stack: error.stack,
             diagnostics,
-            hint: 'Check if your Gmail App Password is still valid and your email is correct. Also check Gmail "Recent Activity" for blocked sign-ins.'
+            hint: 'If you see an SMTP Timeout, Render might be blocked by Gmail. Try using an alternative email or checking your Gmail "Security" tab for blocked sign-ins.'
         });
     }
 });
