@@ -329,22 +329,203 @@ footer {
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .hero {
+/* Additional Components */
+.hero-cta {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.btn-secondary {
+    display: inline-block;
+    padding: 0.8rem 1.8rem;
+    background: transparent;
+    color: var(--text-primary);
+    text-decoration: none;
+    border-radius: 30px;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--accent-color);
+    transform: translateY(-2px);
+}
+
+/* About Section Detail */
+.about-section {
+    padding: 100px 5%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.about-container {
+    display: flex;
+    align-items: center;
+    gap: 4rem;
+}
+
+.about-text {
+    flex: 1.2;
+}
+
+.about-text h2 {
+    font-size: 3.5rem;
+    margin-bottom: 2rem;
+}
+
+.bio {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    margin-bottom: 2.5rem;
+}
+
+.edu-card {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1.5rem;
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: var(--transition);
+}
+
+.edu-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateX(10px);
+}
+
+.edu-icon {
+    font-size: 2.5rem;
+}
+
+.edu-info h3 {
+    font-size: 1.3rem;
+    color: var(--text-primary);
+}
+
+.about-image {
+    flex: 0.8;
+    position: relative;
+}
+
+.image-placeholder {
+    width: 100%;
+    aspect-ratio: 1;
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.1), rgba(138, 43, 226, 0.1));
+    border-radius: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.floating-icons {
+    position: relative;
+    width: 60%;
+    height: 60%;
+}
+
+.icon {
+    position: absolute;
+    font-size: 3rem;
+    animation: float 4s ease-in-out infinite;
+}
+
+.icon:nth-child(1) { top: 0; left: 0; animation-delay: 0s; }
+.icon:nth-child(2) { bottom: 0; right: 0; animation-delay: 1s; }
+.icon:nth-child(3) { top: 50%; left: 50%; transform: translate(-50%, -50%); animation-delay: 2s; }
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+}
+
+/* Skills Section */
+.skills-section {
+    padding: 100px 5%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.skills-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    margin-top: 4rem;
+}
+
+.skill-card {
+    background: rgba(255, 255, 255, 0.02);
+    padding: 2.5rem;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: var(--transition);
+    text-align: center;
+}
+
+.skill-card:hover {
+    transform: translateY(-10px);
+    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--accent-color);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.skill-icon {
+    width: 70px;
+    height: 70px;
+    margin: 0 auto 1.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    font-weight: 800;
+    font-size: 0.9rem;
+}
+
+.skill-icon.html { color: #e34c26; border: 1px solid #e34c26; }
+.skill-icon.css { color: #264de4; border: 1px solid #264de4; }
+.skill-icon.node { color: #3c873a; border: 1px solid #3c873a; }
+.skill-icon.java { color: #f89820; border: 1px solid #f89820; }
+
+.skill-card h3 {
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+}
+
+.skill-card p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+/* Responsive Updates */
+@media (max-width: 992px) {
+    .about-container {
         flex-direction: column;
-        justify-content: center;
         text-align: center;
-        padding-top: 120px;
     }
     
-    .hero h1 { font-size: 3rem; }
+    .about-image {
+        width: 80%;
+        max-width: 400px;
+    }
+}
+
+@media (max-width: 768px) {
+    .hero-cta {
+        flex-direction: column;
+        align-items: center;
+    }
     
-    .hero .description { max-width: 100%; margin: 0 auto 2.5rem; }
+    .about-text h2 { font-size: 2.5rem; }
     
-    .blob { width: 300px; height: 300px; margin-top: 3rem; }
-    
-    .nav-links { display: none; }
-    
-    .contact-container { padding: 1.5rem; }
+    .skills-grid {
+        grid-template-columns: 1fr;
+    }
 }
