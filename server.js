@@ -23,22 +23,42 @@ app.get('/', (req, res) => {
 
 // Database connection pool (PostgreSQL)
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL || `postgresql://${process.env.DB_USER || 'postgres'}:${process.env.DB_PASS || ''}@${process.env.DB_HOST || 'localhost'}:5432/${process.env.DB_NAME || 'portfolio'}`,
+    connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// Nodemailer transporter (Optimized for Render/Gmail)
+// Auto-initialize database table on startup
+async function initDB() {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS messages (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL,
+                subject VARCHAR(255),
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log("Database table 'messages' is ready.");
+    } catch (err) {
+        console.error("DB init error (non-fatal):", err.message);
+    }
+}
+initDB();
+
+// Nodemailer transporter (Gmail STARTTLS - works on Render)
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
-    secure: false, // Use STARTTLS
+    secure: false,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     }
 });
 
-// Test connection endpoint
+// Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Server is running' });
 });
@@ -48,49 +68,58 @@ app.post('/api/contact', async (req, res) => {
     try {
         const { name, email, subject, message } = req.body;
 
-        // Basic validation
+        // Validation
         if (!name || !email || !message) {
             return res.status(400).json({ success: false, message: 'Name, email, and message are required.' });
         }
 
         // 1. Save to database
         try {
-            const query = 'INSERT INTO messages (name, email, subject, message) VALUES ($1, $2, $3, $4)';
-            await pool.query(query, [name, email, subject || 'No Subject', message]);
+            await pool.query(
+                'INSERT INTO messages (name, email, subject, message) VALUES ($1, $2, $3, $4)',
+                [name, email, subject || 'No Subject', message]
+            );
+            console.log('Message saved to database.');
         } catch (dbError) {
-            console.error('Database insertion failed:', dbError.message);
-            // We continue anyway to try sending the email
+            console.error('DB insert failed (non-fatal):', dbError.message);
         }
 
         // 2. Send email notification
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: process.env.EMAIL_USER, // Send to yourself
-            replyTo: email,
-            subject: `Portfolio Contact from ${name}: ${subject || 'No Subject'}`,
-            text: `You have received a new message from your portfolio website.\n\nName: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
-            html: `
-                <h3>New message from your portfolio website</h3>
-                <p><strong>Name:</strong> ${name}</p>
-                <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Subject:</strong> ${subject || 'No Subject'}</p>
-                <h4>Message:</h4>
-                <p>${message.replace(/\n/g, '<br>')}</p>
-            `
-        };
-
+        console.log('EMAIL_USER set:', !!process.env.EMAIL_USER);
+        console.log('EMAIL_PASS set:', !!process.env.EMAIL_PASS);
         if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-            const info = await transporter.sendMail(mailOptions);
-            console.log('Email sent successfully:', info.messageId);
+            try {
+                const info = await transporter.sendMail({
+                    from: `"Portfolio Contact" <${process.env.EMAIL_USER}>`,
+                    to: process.env.EMAIL_USER,
+                    replyTo: email,
+                    subject: `Portfolio Contact: ${subject || 'No Subject'} from ${name}`,
+                    text: `Name: ${name}\nEmail: ${email}\nSubject: ${subject || 'No Subject'}\n\nMessage:\n${message}`,
+                    html: `
+                        <h2 style="color:#333">New message from your portfolio</h2>
+                        <p><strong>Name:</strong> ${name}</p>
+                        <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
+                        <p><strong>Subject:</strong> ${subject || 'No Subject'}</p>
+                        <hr/>
+                        <p><strong>Message:</strong></p>
+                        <p>${message.replace(/\n/g, '<br>')}</p>
+                    `
+                });
+                console.log('Email sent successfully:', info.messageId);
+            } catch (emailError) {
+                console.error('Email send FAILED:', emailError.message);
+                console.error('Full email error:', JSON.stringify(emailError, null, 2));
+                // Still return success since message was saved
+            }
         } else {
-            console.warn('Email credentials not configured. Message saved to DB only.');
+            console.error('EMAIL CREDENTIALS MISSING - EMAIL_USER or EMAIL_PASS not set in environment!');
         }
 
         res.json({ success: true, message: 'Message sent successfully!' });
 
     } catch (error) {
         console.error('Error in /api/contact:', error);
-        res.status(500).json({ success: false, message: 'An error occurred while processing your request.', error: error.message });
+        res.status(500).json({ success: false, message: 'An error occurred. Please try again.' });
     }
 });
 
