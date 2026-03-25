@@ -47,14 +47,60 @@ async function initDB() {
 }
 initDB();
 
-// Nodemailer transporter (Gmail STARTTLS - works on Render)
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+// Nodemailer transporter helper
+function getTransporter() {
+    return nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+        }
+    });
+}
+
+// Diagnostic endpoint to check email configuration on Render
+app.get('/api/test-email', async (req, res) => {
+    const user = process.env.EMAIL_USER;
+    const pass = process.env.EMAIL_PASS;
+
+    if (!user || !pass) {
+        return res.status(500).json({
+            success: false,
+            error: 'MISSING_CREDENTIALS',
+            message: 'EMAIL_USER or EMAIL_PASS environment variables are not set on Render dashboard.',
+            env_user_present: !!user,
+            env_pass_present: !!pass
+        });
+    }
+
+    try {
+        const transporter = getTransporter();
+        await transporter.verify();
+        
+        const info = await transporter.sendMail({
+            from: `"Diagnostic Test" <${user}>`,
+            to: user,
+            subject: 'Render Portfolio Diagnostic Test',
+            text: 'If you are reading this, your Render portfolio email configuration is working correctly!'
+        });
+
+        res.json({
+            success: true,
+            message: 'SMTP connection verified and test email sent!',
+            messageId: info.messageId,
+            user_configured: user
+        });
+    } catch (error) {
+        console.error('Diagnostic email failed:', error);
+        res.status(500).json({
+            success: false,
+            error: error.code || 'SMTP_ERROR',
+            message: error.message,
+            stack: error.stack,
+            hint: 'Check if your Gmail App Password is still valid and your email is correct.'
+        });
     }
 });
 
@@ -89,6 +135,7 @@ app.post('/api/contact', async (req, res) => {
         console.log('EMAIL_PASS set:', !!process.env.EMAIL_PASS);
         if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
             try {
+                const transporter = getTransporter();
                 const info = await transporter.sendMail({
                     from: `"Portfolio Contact" <${process.env.EMAIL_USER}>`,
                     to: process.env.EMAIL_USER,
